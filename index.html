@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hangközelítő</title>
+<style>
+  :root{
+    --paper:  #F2F3F0;
+    --card:   #FFFFFF;
+    --ink:    #1D2126;
+    --muted:  #6B7280;
+    --line:   #D9DCD6;
+    --accent: #2F4BD7;
+    --ok:     #1E7F4F;
+    --ok-bg:  #E7F4EC;
+    --bad:    #C1373C;
+    --bad-bg: #FBECEC;
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; background:var(--paper); color:var(--ink);
+    font:16px/1.5 -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    display:flex; justify-content:center; min-height:100vh;
+  }
+  .app{ width:100%; max-width:600px; padding:24px 16px 48px; }
+
+  header{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  h1{ font:600 20px/1 Georgia, "Iowan Old Style", serif; letter-spacing:.02em; margin:0; }
+  h1 .clef{ color:var(--accent); margin-right:6px; }
+  .hdr-right{ display:flex; align-items:center; gap:14px; }
+  .score{ font-size:14px; color:var(--muted); white-space:nowrap; }
+  .score b{ color:var(--ink); font-size:16px; }
+
+  /* Nyelvváltó – zászló ikonok, hoverre EN/HU felirat */
+  .lang{ display:flex; gap:6px; }
+  .lang button{
+    position:relative; display:flex; align-items:center; justify-content:center;
+    width:34px; height:26px; padding:0; cursor:pointer;
+    background:var(--card); border:1px solid var(--line); border-radius:7px;
+  }
+  .lang button svg{ display:block; border-radius:2px; }
+  .lang button[aria-pressed="true"]{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+  .lang button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .lang button::after{
+    content:attr(data-label);
+    position:absolute; top:calc(100% + 6px); right:0; z-index:2;
+    background:var(--ink); color:#fff; font:600 11px/1 inherit;
+    padding:4px 8px; border-radius:6px;
+    opacity:0; pointer-events:none; transition:opacity .12s;
+  }
+  .lang button:hover::after, .lang button:focus-visible::after{ opacity:1; }
+
+  /* Módváltó fülek */
+  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tabs button{
+    flex:1; font:600 15px/1 inherit; padding:11px 8px; cursor:pointer;
+    background:var(--card); color:var(--muted);
+    border:1px solid var(--line); border-radius:10px;
+  }
+  .tabs button[aria-selected="true"]{
+    color:var(--accent); border-color:var(--accent);
+    box-shadow:inset 0 0 0 1px var(--accent);
+  }
+  .tabs button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+
+  /* Gyakorló mód: kezdőhang-választó, kattintható kártyák, kijelölt hangköz */
+  .picker{ display:none; align-items:center; justify-content:center; gap:10px; margin:0 0 8px; font-size:14px; color:var(--muted); }
+  .picker.visible{ display:flex; }
+  .picker select{
+    font:600 16px/1 inherit; color:var(--ink); background:var(--card);
+    border:1px solid var(--line); border-radius:8px; padding:8px 12px; cursor:pointer;
+  }
+  .picker select:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .note.clickable{ cursor:pointer; }
+  .note.clickable:hover{ border-color:var(--accent); }
+  .answers button.selected{
+    border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent);
+    color:var(--accent); font-weight:700;
+  }
+
+  /* Kérdéskártya */
+  .question{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:26px 20px 24px; text-align:center;
+  }
+  .question .prompt{ font-size:14px; color:var(--muted); margin:0 0 18px; }
+  .staff{
+    position:relative; display:flex; align-items:center; justify-content:center; gap:28px;
+    padding:26px 0;
+    background:repeating-linear-gradient(
+      to bottom, transparent 0 13px, var(--line) 13px 14px) center/100% 70px no-repeat;
+  }
+  .note{
+    background:var(--card); border:1px solid var(--line); border-radius:12px;
+    min-width:110px; padding:14px 18px;
+    font:700 44px/1 Georgia, "Iowan Old Style", serif;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+  }
+  .note.hidden-note{ border-style:dashed; box-shadow:none; color:var(--muted); }
+  .note.playing{ border:1px solid var(--accent); border-style:solid; color:var(--accent); }
+  .note small{ display:block; font:400 12px/1 -apple-system, sans-serif; color:var(--muted); margin-top:8px; }
+  .note sub{ font:400 18px/1 Georgia, serif; color:var(--muted); }
+  .arrow{ font-size:26px; color:var(--accent); }
+
+  .play{
+    margin-top:18px; font:600 16px/1 inherit; color:#fff; background:var(--accent);
+    border:none; border-radius:999px; padding:14px 26px; cursor:pointer;
+    display:none; align-items:center; gap:10px;
+  }
+  .play.visible{ display:inline-flex; }
+  .play:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  .hint{ font-size:13px; color:var(--muted); margin:12px 0 0; display:none; }
+  .hint.visible{ display:block; }
+
+  /* Válaszgombok */
+  .answers{
+    margin-top:20px;
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px;
+  }
+  .answers button{
+    font:500 15px/1.2 inherit; color:var(--ink);
+    background:var(--card); border:1px solid var(--line); border-radius:10px;
+    padding:13px 8px; cursor:pointer;
+  }
+  .answers button:hover:not(:disabled){ border-color:var(--accent); }
+  .answers button:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .answers button:disabled{ cursor:default; opacity:.55; }
+  .answers button.correct{ background:var(--ok-bg); border-color:var(--ok); color:var(--ok); font-weight:700; opacity:1; }
+  .answers button.wrong{ background:var(--bad-bg); border-color:var(--bad); color:var(--bad); opacity:1; }
+
+  /* Visszajelzés */
+  .feedback{
+    margin-top:16px; padding:14px 16px; border-radius:10px;
+    display:none; align-items:center; justify-content:space-between; gap:12px;
+  }
+  .feedback.show{ display:flex; }
+  .feedback.ok{ background:var(--ok-bg); color:var(--ok); }
+  .feedback.bad{ background:var(--bad-bg); color:var(--bad); }
+  .feedback p{ margin:0; font-size:15px; }
+  .feedback p small{ display:block; color:var(--muted); font-size:13px; margin-top:2px; }
+  .next{
+    flex:none; font:600 15px/1 inherit; color:#fff; background:var(--accent);
+    border:none; border-radius:10px; padding:12px 20px; cursor:pointer;
+  }
+  .next:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  footer{ margin-top:28px; text-align:center; font-size:13px; color:var(--muted); }
+
+  @media (prefers-reduced-motion: no-preference){
+    .staff.pop .note{ animation:pop .25s ease; }
+    @keyframes pop{ from{ transform:scale(.94); opacity:.4; } to{ transform:none; opacity:1; } }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1><span class="clef">♪</span><span id="appTitle">Hangközelítő</span></h1>
+    <div class="hdr-right">
+      <div class="score" id="scoreBox"><span id="scoreLabel">Pontszám:</span> <b id="score">0</b> / <span id="total">0</span></div>
+      <div class="lang" id="langBox" role="group" aria-label="Nyelv / Language">
+        <button id="btnHu" data-label="HU" aria-pressed="true" aria-label="Magyar">
+          <svg viewBox="0 0 60 40" width="22" height="15" aria-hidden="true">
+            <rect width="60" height="40" fill="#477050"/>
+            <rect width="60" height="26.7" fill="#fff"/>
+            <rect width="60" height="13.3" fill="#CE2939"/>
+          </svg>
+        </button>
+        <button id="btnEn" data-label="EN" aria-pressed="false" aria-label="English">
+          <svg viewBox="0 0 60 40" width="22" height="15" aria-hidden="true">
+            <rect width="60" height="40" fill="#012169"/>
+            <path d="M0,0 L60,40 M60,0 L0,40" stroke="#fff" stroke-width="8"/>
+            <path d="M0,0 L60,40 M60,0 L0,40" stroke="#C8102E" stroke-width="4"/>
+            <path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13"/>
+            <path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="tabs" id="tabsBox" role="tablist" aria-label="Játékmód">
+    <button id="tabLook" role="tab" aria-selected="true">🎼 Kotta szerint</button>
+    <button id="tabEar"  role="tab" aria-selected="false">🎧 Hallás után</button>
+    <button id="tabPractice" role="tab" aria-selected="false">🎹 Gyakorlás</button>
+  </div>
+
+  <section class="question" aria-live="polite">
+    <p class="prompt" id="prompt">Mekkora a hangköz a két hang között?</p>
+    <div class="picker" id="picker">
+      <label for="startNote" id="startLabel">Kezdőhang:</label>
+      <select id="startNote"></select>
+    </div>
+    <div class="staff" id="staff">
+      <div class="note" id="lower">G<small>alsó hang</small></div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="note" id="upper">A<small>felső hang</small></div>
+    </div>
+    <button class="play" id="playBtn">▶ Lejátszás</button>
+    <p class="hint" id="hint"></p>
+  </section>
+
+  <div class="answers" id="answers" role="group" aria-label="Válaszlehetőségek"></div>
+
+  <div class="feedback" id="feedback">
+    <p id="feedbackText"></p>
+    <button class="next" id="nextBtn">Következő →</button>
+  </div>
+
+  <footer id="footerNote"></footer>
+</div>
+
+<script>
+/* ════════════════ Nyelvi szótár ════════════════ */
+const STR = {
+  hu: {
+    title: "Hangközelítő",
+    tabLook: "🎼 Kotta szerint", tabEar: "🎧 Hallás után", tabPractice: "🎹 Gyakorlás",
+    modeAria: "Játékmód", answersAria: "Válaszlehetőségek",
+    score: "Pontszám:", startNote: "Kezdőhang:",
+    play: "▶ Lejátszás", next: "Következő →",
+    lowerNote: "alsó hang", upperNote: "felső hang", pickIntervalLabel: "válassz hangközt",
+    promptLook: "Mekkora a hangköz a két hang között?",
+    promptEar: "Hallgasd meg a két hangot, és találd ki a hangközt!",
+    promptPractice: "Válassz kezdőhangot, majd nyomj meg egy hangközt – és hallgasd meg!",
+    hintEar: "A válaszgombok az első meghallgatás után aktívak. Bármikor újrahallgathatod.",
+    hintPractice: "A kártyákra kattintva a hangok külön is megszólalnak, a ▶ gombbal egymás után.",
+    footLook: "Egy kérdésben csak ♯ vagy csak ♭ szerepelhet · a felső hang mindig magasabb · B = leszállított H",
+    footEar: "Hallás után csak a félhangok száma számít – az írásmód (♯/♭) nem.",
+    footPractice: "Szabad gyakorlás pontozás nélkül – hallgasd sokat a hangközöket, hogy fülre ismerd fel őket!",
+    correct: "Helyes! ", wrongPrefix: "Nem talált – a helyes válasz: ",
+    degreeWord: "(fok)", listenAgain: "hallgasd vissza a ▶ gombbal!",
+    semis: n => n + " félhang",
+    deg: {1:"prím", 2:"szekund", 3:"terc", 4:"kvart", 5:"kvint", 6:"szext", 7:"szeptim"},
+    look: ["Tiszta prím","Bővített prím","Kis szekund","Nagy szekund","Kis terc","Nagy terc",
+           "Tiszta kvart","Tritónusz","Tiszta kvint","Kis szext","Nagy szext","Kis szeptim","Nagy szeptim"],
+    ear:  ["Tiszta prím","Kis szekund","Nagy szekund","Kis terc","Nagy terc","Tiszta kvart",
+           "Tritónusz","Tiszta kvint","Kis szext","Nagy szext","Kis szeptim","Nagy szeptim","Tiszta oktáv"]
+  },
+  en: {
+    title: "Mind the Gap",
+    tabLook: "🎼 By notation", tabEar: "🎧 By ear", tabPractice: "🎹 Practice",
+    modeAria: "Game mode", answersAria: "Answer options",
+    score: "Score:", startNote: "Starting note:",
+    play: "▶ Play", next: "Next →",
+    lowerNote: "lower note", upperNote: "upper note", pickIntervalLabel: "pick an interval",
+    promptLook: "What is the interval between the two notes?",
+    promptEar: "Listen to the two notes and identify the interval!",
+    promptPractice: "Choose a starting note, then press an interval – and listen!",
+    hintEar: "Answer buttons unlock after the first listen. Replay as many times as you like.",
+    hintPractice: "Click a card to play that note on its own, or press ▶ to hear both in sequence.",
+    footLook: "Each question uses only ♯ or only ♭ · the upper note is always higher",
+    footEar: "By ear only the number of semitones matters – the spelling (♯/♭) does not.",
+    footPractice: "Free practice without scoring – listen to intervals often to learn them by ear!",
+    correct: "Correct! ", wrongPrefix: "Not quite – the correct answer is: ",
+    degreeWord: "(degree)", listenAgain: "listen again with ▶!",
+    semis: n => n + (n === 1 ? " semitone" : " semitones"),
+    deg: {1:"unison", 2:"second", 3:"third", 4:"fourth", 5:"fifth", 6:"sixth", 7:"seventh"},
+    look: ["Perfect unison","Augmented unison","Minor second","Major second","Minor third","Major third",
+           "Perfect fourth","Tritone","Perfect fifth","Minor sixth","Major sixth","Minor seventh","Major seventh"],
+    ear:  ["Perfect unison","Minor second","Major second","Minor third","Major third","Perfect fourth",
+           "Tritone","Perfect fifth","Minor sixth","Major sixth","Minor seventh","Major seventh","Perfect octave"]
+  }
+};
+let lang = "hu";
+const S = () => STR[lang];
+
+/* ════════════════ Közös zeneelméleti alap ════════════════
+   Belső jelölés: törzshangsor C D E F G A H, a leszállított H jele "B".
+   Megjelenítéskor fordítjuk: magyarul H és B, angolul B és B♭. */
+
+const LETTERS = { C:{i:0,p:0}, D:{i:1,p:2}, E:{i:2,p:4}, F:{i:3,p:5}, G:{i:4,p:7}, A:{i:5,p:9}, H:{i:6,p:11} };
+const SHARP_POOL = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","H"];
+const FLAT_POOL  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","B","H"];
+
+/* fok:félhang → index a look-listában (mindkét nyelven azonos sorrend) */
+const NAME_IDX = {
+  "1:0":0,  "1:1":1,
+  "2:1":2,  "2:2":3,
+  "3:3":4,  "3:4":5,
+  "4:5":6,  "4:6":7, "5:6":7,
+  "5:7":8,
+  "6:8":9,  "6:9":10,
+  "7:10":11,"7:11":12
+};
+
+function parse(n){
+  if (n === "B") return { letter:"H", acc:"b", value:10 };   // B = leszállított H
+  const acc = n[1] || "";
+  return { letter:n[0], acc, value: LETTERS[n[0]].p + (acc==="#"?1:acc==="b"?-1:0) };
+}
+
+function noteLabel(token){
+  if (lang === "hu"){
+    if (token === "B") return "B";
+    return token.replace("#","♯").replace(/(?<=.)b/,"♭");
+  }
+  if (token === "B") return "B♭";
+  if (token === "H") return "B";
+  return token.replace("#","♯").replace(/(?<=.)b/,"♭");
+}
+
+function makeLookQuestion(){
+  const pool = Math.random() < .5 ? SHARP_POOL : FLAT_POOL;
+  for(;;){
+    let a = pool[Math.floor(Math.random()*12)], b = pool[Math.floor(Math.random()*12)];
+    let lo = parse(a), hi = parse(b);
+    if (lo.value > hi.value) [lo, hi, a, b] = [hi, lo, b, a];
+    const deg   = (LETTERS[hi.letter].i - LETTERS[lo.letter].i + 7) % 7 + 1;
+    const semis = hi.value - lo.value;
+    const key   = deg + ":" + semis;
+    if (key in NAME_IDX) return { mode:"look", lower:a, upper:b, deg, semis, idx: NAME_IDX[key] };
+  }
+}
+
+function makeEarQuestion(){
+  const semis = Math.floor(Math.random() * 13);                     // 0..12
+  const low   = 52 + Math.floor(Math.random() * (77 - 52 - semis)); // E3..F5 tartomány
+  return { mode:"ear", low, high: low + semis, semis, idx: semis }; // ear-listában index = félhang
+}
+
+/* ════════════════ Web Audio ════════════════ */
+let ctx;
+const freq = m => 440 * Math.pow(2, (m - 69) / 12);
+const PC = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯"];
+const pcName = m => (m % 12 === 11) ? (lang === "hu" ? "H" : "B") : PC[m % 12];
+const midiLabel = m => pcName(m) + "<sub>" + (Math.floor(m/12) - 1) + "</sub>";
+const midiPlain = m => pcName(m) + (Math.floor(m/12) - 1);
+
+function tone(midi, when, dur){
+  const osc = ctx.createOscillator(), gain = ctx.createGain();
+  osc.type = "triangle";
+  osc.frequency.value = freq(midi);
+  gain.gain.setValueAtTime(0, when);
+  gain.gain.linearRampToValueAtTime(0.35, when + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(when); osc.stop(when + dur + 0.05);
+}
+
+function play(){
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  const t = ctx.currentTime + 0.05, dur = 0.9, gap = 0.25;
+  const lowMidi  = mode === "practice" ? pLow : q.low;
+  const highMidi = mode === "practice" ? (pSemis === null ? null : pLow + pSemis) : q.high;
+  tone(lowMidi, t, dur);
+  flash(el("lower"), 0, dur);
+  if (highMidi !== null){
+    tone(highMidi, t + dur + gap, dur);
+    flash(el("upper"), (dur + gap) * 1000, dur);
+  }
+  if (mode === "ear"){
+    heard = true;
+    if (!answered) setButtons(false);
+  }
+}
+
+function playNote(midi, node){
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  tone(midi, ctx.currentTime + 0.05, 0.9);
+  flash(node, 0, 0.9);
+}
+
+function flash(node, delayMs, dur){
+  setTimeout(() => {
+    node.classList.add("playing");
+    setTimeout(() => node.classList.remove("playing"), dur * 1000);
+  }, delayMs);
+}
+
+/* ════════════════ Gyakorló mód (3. fül) ════════════════ */
+let pLow = 60, pSemis = null;    // alapértelmezés: C4, még nincs hangköz
+
+function fillPickerOptions(){
+  const sel = el("startNote");
+  sel.innerHTML = "";
+  for (let m = 48; m <= 72; m++){          // C3 .. C5
+    const o = document.createElement("option");
+    o.value = m;
+    o.textContent = midiPlain(m);
+    if (m === pLow) o.selected = true;
+    sel.appendChild(o);
+  }
+}
+
+function renderPractice(){
+  const s = S();
+  el("lower").innerHTML = midiLabel(pLow) + "<small>" + s.lowerNote + " · ▶</small>";
+  el("lower").classList.remove("hidden-note");
+  el("lower").classList.add("clickable");
+  if (pSemis === null){
+    el("upper").innerHTML = "?<small>" + s.pickIntervalLabel + "</small>";
+    el("upper").classList.add("hidden-note");
+    el("upper").classList.remove("clickable");
+  } else {
+    el("upper").innerHTML = midiLabel(pLow + pSemis) + "<small>" + s.upperNote + " · ▶</small>";
+    el("upper").classList.remove("hidden-note");
+    el("upper").classList.add("clickable");
+  }
+  [...el("answers").children].forEach((b, i) => b.classList.toggle("selected", i === pSemis));
+}
+
+function pickInterval(semis){
+  pSemis = semis;
+  renderPractice();
+  play();                                  // a pár azonnal megszólal
+}
+
+/* ════════════════ UI ════════════════ */
+let mode = "look", q, heard = false, answered = false, score = 0, total = 0;
+const el = id => document.getElementById(id);
+const setButtons = disabled =>
+  el("answers").querySelectorAll("button").forEach(b => b.disabled = disabled);
+const resetButtons = disabled =>
+  el("answers").querySelectorAll("button").forEach(b => { b.disabled = disabled; b.className = ""; });
+
+function buildAnswers(){
+  el("answers").innerHTML = "";
+  const list = mode === "look" ? S().look : S().ear;   // gyakorláshoz is a 0..12 félhangos lista
+  list.forEach((label, i) => {
+    const b = document.createElement("button");
+    b.textContent = label;
+    b.addEventListener("click", () => mode === "practice" ? pickInterval(i) : answer(i, b));
+    el("answers").appendChild(b);
+  });
+}
+
+function render(){
+  answered = false; heard = false;
+  el("feedback").className = "feedback";
+  const s = S();
+  if (mode === "practice"){
+    renderPractice();
+    return;
+  }
+  if (mode === "look"){
+    q = makeLookQuestion();
+    el("lower").innerHTML = noteLabel(q.lower) + "<small>" + s.lowerNote + "</small>";
+    el("upper").innerHTML = noteLabel(q.upper) + "<small>" + s.upperNote + "</small>";
+    el("lower").classList.remove("hidden-note", "clickable");
+    el("upper").classList.remove("hidden-note", "clickable");
+    el("staff").classList.remove("pop"); void el("staff").offsetWidth; el("staff").classList.add("pop");
+    resetButtons(false);
+  } else {
+    q = makeEarQuestion();
+    el("lower").innerHTML = "?<small>" + s.lowerNote + "</small>";
+    el("upper").innerHTML = "?<small>" + s.upperNote + "</small>";
+    el("lower").classList.add("hidden-note");
+    el("upper").classList.add("hidden-note");
+    el("lower").classList.remove("clickable");
+    el("upper").classList.remove("clickable");
+    resetButtons(true);                     // csak meghallgatás után lehet válaszolni
+  }
+}
+
+function answer(idx, btn){
+  if (answered || (mode === "ear" && !heard)) return;
+  answered = true; total++;
+  const s = S();
+  const list = mode === "look" ? s.look : s.ear;
+  const ok = idx === q.idx;
+  if (ok) score++;
+  el("score").textContent = score; el("total").textContent = total;
+  [...el("answers").children].forEach((b, i) => {
+    b.disabled = true;
+    if (i === q.idx) b.classList.add("correct");
+  });
+  if (!ok) btn.classList.add("wrong");
+
+  let detail;
+  if (mode === "look"){
+    detail = noteLabel(q.lower) + " → " + noteLabel(q.upper) + " · " +
+             s.deg[q.deg] + " " + s.degreeWord + " · " + s.semis(q.semis);
+  } else {
+    /* kiértékelés után felfedjük a hangokat */
+    el("lower").innerHTML = midiLabel(q.low)  + "<small>" + s.lowerNote + "</small>";
+    el("upper").innerHTML = midiLabel(q.high) + "<small>" + s.upperNote + "</small>";
+    el("lower").classList.remove("hidden-note");
+    el("upper").classList.remove("hidden-note");
+    detail = s.semis(q.semis) + " · " + s.listenAgain;
+  }
+  el("feedbackText").innerHTML =
+    (ok ? s.correct : s.wrongPrefix + "<b>" + list[q.idx].toLowerCase() + "</b>. ") +
+    "<small>" + detail + "</small>";
+  el("feedback").className = "feedback show " + (ok ? "ok" : "bad");
+  el("nextBtn").focus();
+}
+
+function setMode(m){
+  mode = m;
+  const s = S();
+  el("tabLook").setAttribute("aria-selected", m === "look");
+  el("tabEar").setAttribute("aria-selected", m === "ear");
+  el("tabPractice").setAttribute("aria-selected", m === "practice");
+  el("prompt").textContent = { look: s.promptLook, ear: s.promptEar, practice: s.promptPractice }[m];
+  el("playBtn").classList.toggle("visible", m !== "look");
+  el("hint").textContent = m === "practice" ? s.hintPractice : s.hintEar;
+  el("hint").classList.toggle("visible", m !== "look");
+  el("picker").classList.toggle("visible", m === "practice");
+  el("scoreBox").style.visibility = m === "practice" ? "hidden" : "visible";
+  el("footerNote").textContent = { look: s.footLook, ear: s.footEar, practice: s.footPractice }[m];
+  buildAnswers();
+  render();
+}
+
+function applyLang(l){
+  lang = l;
+  const s = S();
+  document.documentElement.lang = l;
+  document.title = s.title;
+  el("appTitle").textContent = s.title;
+  el("btnEn").setAttribute("aria-pressed", l === "en");
+  el("btnHu").setAttribute("aria-pressed", l === "hu");
+  el("scoreLabel").textContent = s.score;
+  el("startLabel").textContent = s.startNote;
+  el("playBtn").textContent = s.play;
+  el("nextBtn").textContent = s.next;
+  el("tabLook").textContent = s.tabLook;
+  el("tabEar").textContent = s.tabEar;
+  el("tabPractice").textContent = s.tabPractice;
+  el("tabsBox").setAttribute("aria-label", s.modeAria);
+  el("answers").setAttribute("aria-label", s.answersAria);
+  fillPickerOptions();
+  setMode(mode);      // felirat- és kérdésfrissítés az aktuális fülön
+}
+
+el("tabLook").addEventListener("click", () => setMode("look"));
+el("tabEar").addEventListener("click", () => setMode("ear"));
+el("tabPractice").addEventListener("click", () => setMode("practice"));
+el("btnEn").addEventListener("click", () => { if (lang !== "en") applyLang("en"); });
+el("btnHu").addEventListener("click", () => { if (lang !== "hu") applyLang("hu"); });
+el("playBtn").addEventListener("click", play);
+el("nextBtn").addEventListener("click", render);
+el("lower").addEventListener("click", () => { if (mode === "practice") playNote(pLow, el("lower")); });
+el("upper").addEventListener("click", () => { if (mode === "practice" && pSemis !== null) playNote(pLow + pSemis, el("upper")); });
+el("startNote").addEventListener("change", e => {
+  pLow = +e.target.value;
+  renderPractice();
+  playNote(pLow, el("lower"));            // az új kezdőhang azonnal hallható
+});
+applyLang("hu");
+</script>
+</body>
+</html>
