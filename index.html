@@ -52,9 +52,9 @@
   .lang button:hover::after, .lang button:focus-visible::after{ opacity:1; }
 
   /* Módváltó fülek */
-  .tabs{ display:flex; gap:8px; margin-bottom:16px; }
+  .tabs{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:16px; }
   .tabs button{
-    flex:1; font:600 15px/1 inherit; padding:11px 8px; cursor:pointer;
+    flex:1 1 130px; font:600 15px/1 inherit; padding:11px 8px; cursor:pointer;
     background:var(--card); color:var(--muted);
     border:1px solid var(--line); border-radius:10px;
   }
@@ -139,11 +139,59 @@
   .feedback.bad{ background:var(--bad-bg); color:var(--bad); }
   .feedback p{ margin:0; font-size:15px; }
   .feedback p small{ display:block; color:var(--muted); font-size:13px; margin-top:2px; }
+  .fb-actions{ flex:none; display:flex; align-items:center; gap:12px; }
+  .why{
+    background:none; border:none; padding:0; cursor:pointer;
+    font:500 14px/1 inherit; color:var(--accent); text-decoration:underline;
+    display:none;
+  }
+  .why:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
   .next{
-    flex:none; font:600 15px/1 inherit; color:#fff; background:var(--accent);
+    font:600 15px/1 inherit; color:#fff; background:var(--accent);
     border:none; border-radius:10px; padding:12px 20px; cursor:pointer;
   }
   .next:focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+
+  /* Miért? felugró kártya */
+  .overlay{
+    position:fixed; inset:0; z-index:20; display:none;
+    align-items:center; justify-content:center; padding:16px;
+    background:rgba(29,33,38,.45);
+  }
+  .overlay.show{ display:flex; }
+  .modal{
+    background:var(--card); border-radius:14px; max-width:440px; width:100%;
+    padding:22px 22px 18px; box-shadow:0 12px 40px rgba(0,0,0,.25);
+  }
+  .modal h2{ font:600 19px/1.3 Georgia, "Iowan Old Style", serif; margin:0 0 12px; }
+  .modal p{ font-size:15px; margin:0 0 16px; }
+  .modal .next{ display:block; margin-left:auto; }
+
+  /* Tudástár */
+  .knowledge{ display:none; }
+  .knowledge.visible{ display:block; }
+  .kcard{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:20px; margin-bottom:14px;
+  }
+  .kcard h2{ font:600 17px/1.3 Georgia, "Iowan Old Style", serif; margin:0 0 8px; }
+  .kcard p{ font-size:15px; margin:8px 0 0; }
+  .krow{
+    display:flex; gap:12px; align-items:center;
+    padding:10px 12px; border:1px solid var(--line); border-radius:10px;
+    margin-top:8px; cursor:pointer;
+  }
+  .krow:hover{ border-color:var(--accent); }
+  .krow.playing{ border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+  .kplay{
+    flex:none; width:36px; height:36px; border-radius:999px; border:none;
+    background:var(--accent); color:#fff; cursor:pointer; font-size:13px;
+  }
+  .ktext{ font-size:15px; line-height:1.4; }
+  .ktext small{ color:var(--muted); }
+  .enh dt{ font-weight:600; margin-top:10px; font-size:15px; }
+  .enh dd{ margin:2px 0 0; color:var(--muted); font-size:14px; }
+  .enh{ margin:0; }
 
   footer{ margin-top:28px; text-align:center; font-size:13px; color:var(--muted); }
 
@@ -185,9 +233,10 @@
     <button id="tabLook" role="tab" aria-selected="true">🎼 Kotta szerint</button>
     <button id="tabEar"  role="tab" aria-selected="false">🎧 Hallás után</button>
     <button id="tabPractice" role="tab" aria-selected="false">🎹 Gyakorlás</button>
+    <button id="tabKnow" role="tab" aria-selected="false">📖 Tudástár</button>
   </div>
 
-  <section class="question" aria-live="polite">
+  <section class="question" id="questionCard" aria-live="polite">
     <p class="prompt" id="prompt">Mekkora a hangköz a két hang között?</p>
     <div class="picker" id="picker">
       <label for="startNote" id="startLabel">Kezdőhang:</label>
@@ -206,10 +255,23 @@
 
   <div class="feedback" id="feedback">
     <p id="feedbackText"></p>
-    <button class="next" id="nextBtn">Következő →</button>
+    <div class="fb-actions">
+      <button class="why" id="whyBtn">Miért?</button>
+      <button class="next" id="nextBtn">Következő →</button>
+    </div>
   </div>
 
+  <section class="knowledge" id="knowledge"></section>
+
   <footer id="footerNote"></footer>
+</div>
+
+<div class="overlay" id="whyOverlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="whyTitle">
+    <h2 id="whyTitle"></h2>
+    <p id="whyBody"></p>
+    <button class="next" id="whyClose">Bezárás</button>
+  </div>
 </div>
 
 <script>
@@ -217,7 +279,7 @@
 const STR = {
   hu: {
     title: "Hangközelítő",
-    tabLook: "🎼 Kotta szerint", tabEar: "🎧 Hallás után", tabPractice: "🎹 Gyakorlás",
+    tabLook: "🎼 Kotta szerint", tabEar: "🎧 Hallás után", tabPractice: "🎹 Gyakorlás", tabKnow: "📖 Tudástár",
     modeAria: "Játékmód", answersAria: "Válaszlehetőségek",
     score: "Pontszám:", startNote: "Kezdőhang:",
     play: "▶ Lejátszás", next: "Következő →",
@@ -230,18 +292,62 @@ const STR = {
     footLook: "Egy kérdésben csak ♯ vagy csak ♭ szerepelhet · a felső hang mindig magasabb · B = leszállított H",
     footEar: "Hallás után csak a félhangok száma számít – az írásmód (♯/♭) nem.",
     footPractice: "Szabad gyakorlás pontozás nélkül – hallgasd sokat a hangközöket, hogy fülre ismerd fel őket!",
+    footKnow: "Az elmélet akkor ragad meg, ha rögtön meg is hallgatod – kattints a sorokra!",
     correct: "Helyes! ", wrongPrefix: "Nem talált – a helyes válasz: ",
     degreeWord: "(fok)", listenAgain: "hallgasd vissza a ▶ gombbal!",
-    semis: n => n + " félhang",
+    semis: function(n){ return n + " félhang"; },
     deg: {1:"prím", 2:"szekund", 3:"terc", 4:"kvart", 5:"kvint", 6:"szext", 7:"szeptim"},
-    look: ["Tiszta prím","Bővített prím","Kis szekund","Nagy szekund","Kis terc","Nagy terc",
+    look: ["Tiszta prím","Kis szekund","Nagy szekund","Kis terc","Nagy terc",
            "Tiszta kvart","Tritónusz","Tiszta kvint","Kis szext","Nagy szext","Kis szeptim","Nagy szeptim"],
     ear:  ["Tiszta prím","Kis szekund","Nagy szekund","Kis terc","Nagy terc","Tiszta kvart",
-           "Tritónusz","Tiszta kvint","Kis szext","Nagy szext","Kis szeptim","Nagy szeptim","Tiszta oktáv"]
+           "Tritónusz","Tiszta kvint","Kis szext","Nagy szext","Kis szeptim","Nagy szeptim","Tiszta oktáv"],
+    why: "Miért?", close: "Bezárás",
+    whyDistance: function(n){ return "A távolság: " + n + " félhang."; },
+    qualUnison: "0 félhang – a két hang azonos, ez a tiszta prím.",
+    qualAugUnison: "Elméletben ez „bővített prím” lenne, de pontosan úgy szól, mint a kis szekund (pl. G♯ = A♭), ezért az app kis szekundnak nevezi – a hangzás a lényeg.",
+    qualTritone: "6 félhang = tritónusz. Elméletben bővített kvart vagy szűkített kvint, de a kettő ugyanúgy szól.",
+    qualMinMaj: function(degName, mi, ma){
+      return "A " + degName + " két változatban létezik: " + mi + " félhang = kis, " + ma + " félhang = nagy.";
+    },
+    qualPerfect: function(degName, n){
+      return "A " + degName + " „tiszta” hangköz: mindig " + n + " félhang.";
+    },
+    kIntroTitle: "Mi az a hangköz?",
+    kIntro: [
+      "A hangköz (idegen szóval intervallum) két zenei hang távolsága.",
+      "A hangköz nevét két tényező együtt határozza meg. A <b>fok</b> megmutatja, hányadik hanglépcsőn áll a felső hang az alsótól számolva (prím, szekund, terc…). A <b>minőség</b> pedig a hangköz pontos méretét adja meg, félhangokban mérve (kis, nagy, tiszta)."
+    ],
+    kTableTitle: "Hangközök egy hallgatásra",
+    kTableHint: "Kattints egy sorra, és meghallod C-ről indítva. A dal segít megjegyezni, hogyan szól.",
+    kEnhTitle: "Ugyanúgy szól, másképp írjuk (enharmónia)",
+    kEnh: [
+      ["Bővített prím = kis szekund", "G–G♯ ugyanúgy szól, mint G–A♭: mindkettő 1 félhang. Ezért az app mindkettőt kis szekundnak nevezi."],
+      ["Bővített kvart = szűkített kvint = tritónusz", "F–H és H–F egyaránt 6 félhang – közös nevük: tritónusz."],
+      ["C♯ = D♭", "Ugyanaz a billentyű a zongorán, csak másképp írjuk le."]
+    ],
+    kQualTitle: "Kis, nagy, tiszta – mi a logika?",
+    kQual: "A prím, a kvart, a kvint és az oktáv „tiszta” hangközök: egyetlen alapváltozatuk van. A szekund, a terc, a szext és a szeptim két változatban létezik, és a kisebbik mindig egy félhanggal szűkebb a nagyobbnál (pl. kis terc = 3, nagy terc = 4 félhang).",
+    kNamesTitle: "H és B – a magyar hangnevek",
+    kNames: "A magyar (és német) kottázásban az angol B hang neve H, a leszállított H-é pedig egyszerűen B. Innen ered a híres B–A–C–H motívum: négy különböző hang, amely kiadja Bach nevét.",
+    songs: [
+      "ugyanaz a hang kétszer",
+      "Cápa – filmtéma",
+      "Boldog szülinapot (Happy Birthday) – első lépése",
+      "Smoke on the Water (Deep Purple) – riff",
+      "Boci, boci tarka",
+      "Harry Potter – főtéma (Hedwig's Theme)",
+      "Purple Haze (Jimi Hendrix) – nyitóriff",
+      "Star Wars – főtéma",
+      "Love Story – „Where do I begin” kezdőlépése",
+      "My Bonnie Lies over the Ocean – „My Bon-nie”",
+      "Star Trek – eredeti főcím",
+      "Take on Me (a-ha) – refrén",
+      "Somewhere Over the Rainbow"
+    ]
   },
   en: {
     title: "Mind the Gap",
-    tabLook: "🎼 By notation", tabEar: "🎧 By ear", tabPractice: "🎹 Practice",
+    tabLook: "🎼 By notation", tabEar: "🎧 By ear", tabPractice: "🎹 Practice", tabKnow: "📖 Learn",
     modeAria: "Game mode", answersAria: "Answer options",
     score: "Score:", startNote: "Starting note:",
     play: "▶ Play", next: "Next →",
@@ -254,14 +360,58 @@ const STR = {
     footLook: "Each question uses only ♯ or only ♭ · the upper note is always higher",
     footEar: "By ear only the number of semitones matters – the spelling (♯/♭) does not.",
     footPractice: "Free practice without scoring – listen to intervals often to learn them by ear!",
+    footKnow: "Theory sticks best when you hear it right away – tap the rows!",
     correct: "Correct! ", wrongPrefix: "Not quite – the correct answer is: ",
     degreeWord: "(degree)", listenAgain: "listen again with ▶!",
-    semis: n => n + (n === 1 ? " semitone" : " semitones"),
+    semis: function(n){ return n + (n === 1 ? " semitone" : " semitones"); },
     deg: {1:"unison", 2:"second", 3:"third", 4:"fourth", 5:"fifth", 6:"sixth", 7:"seventh"},
-    look: ["Perfect unison","Augmented unison","Minor second","Major second","Minor third","Major third",
+    look: ["Perfect unison","Minor second","Major second","Minor third","Major third",
            "Perfect fourth","Tritone","Perfect fifth","Minor sixth","Major sixth","Minor seventh","Major seventh"],
     ear:  ["Perfect unison","Minor second","Major second","Minor third","Major third","Perfect fourth",
-           "Tritone","Perfect fifth","Minor sixth","Major sixth","Minor seventh","Major seventh","Perfect octave"]
+           "Tritone","Perfect fifth","Minor sixth","Major sixth","Minor seventh","Major seventh","Perfect octave"],
+    why: "Why?", close: "Close",
+    whyDistance: function(n){ return "The distance is " + n + (n === 1 ? " semitone." : " semitones."); },
+    qualUnison: "0 semitones – the two notes are the same: a perfect unison.",
+    qualAugUnison: "In strict theory this would be an “augmented unison”, but it sounds exactly like a minor second (e.g. G♯ = A♭), so this app calls it a minor second – the sound is what matters.",
+    qualTritone: "6 semitones = tritone. In theory it is an augmented fourth or a diminished fifth, but the two sound the same.",
+    qualMinMaj: function(degName, mi, ma){
+      return "The " + degName + " comes in two sizes: " + mi + " semitone(s) = minor, " + ma + " = major.";
+    },
+    qualPerfect: function(degName, n){
+      return "The " + degName + " is a “perfect” interval: it is always " + n + " semitones.";
+    },
+    kIntroTitle: "What is an interval?",
+    kIntro: [
+      "An interval is the distance in pitch between two musical notes.",
+      "The name of an interval is defined by two things together. The <b>degree</b> tells you which scale step the upper note stands on, counted from the lower one (unison, second, third…). The <b>quality</b> gives the exact size of the interval, measured in semitones (minor, major, perfect)."
+    ],
+    kTableTitle: "Intervals at a glance",
+    kTableHint: "Tap a row to hear it, starting from C. The song helps you remember how it sounds.",
+    kEnhTitle: "Same sound, different spelling (enharmonics)",
+    kEnh: [
+      ["Augmented unison = minor second", "G–G♯ sounds exactly like G–A♭: both are 1 semitone. That is why this app calls both a minor second."],
+      ["Augmented fourth = diminished fifth = tritone", "F–B and B–F are both 6 semitones – their common name is the tritone."],
+      ["C♯ = D♭", "The same key on the piano, just written differently."]
+    ],
+    kQualTitle: "Minor, major, perfect – the logic",
+    kQual: "The unison, fourth, fifth and octave are “perfect” intervals: they have one basic size. The second, third, sixth and seventh come in two sizes, and the minor one is always one semitone smaller than the major (e.g. minor third = 3, major third = 4 semitones).",
+    kNamesTitle: "H and B – the Hungarian note names",
+    kNames: "Hungarian (and German) notation calls the English B note “H”, and the lowered H is simply “B”. This is where the famous B–A–C–H motif comes from: four different notes that spell Bach's name. The English version of this app uses the international names: B and B♭.",
+    songs: [
+      "the same note twice",
+      "Jaws – main theme",
+      "Happy Birthday (first step)",
+      "Smoke on the Water (Deep Purple) – riff",
+      "Oh, When the Saints",
+      "Harry Potter – main theme (Hedwig's Theme)",
+      "Purple Haze (Jimi Hendrix) – opening riff",
+      "Star Wars – main theme",
+      "Love Story – “Where do I begin” (first leap)",
+      "My Bonnie Lies over the Ocean – “My Bon-nie”",
+      "Star Trek – original theme",
+      "Take on Me (a-ha) – chorus",
+      "Somewhere Over the Rainbow"
+    ]
   }
 };
 let lang = "hu";
@@ -275,16 +425,21 @@ const LETTERS = { C:{i:0,p:0}, D:{i:1,p:2}, E:{i:2,p:4}, F:{i:3,p:5}, G:{i:4,p:7
 const SHARP_POOL = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","H"];
 const FLAT_POOL  = ["C","Db","D","Eb","E","F","Gb","G","Ab","A","B","H"];
 
-/* fok:félhang → index a look-listában (mindkét nyelven azonos sorrend) */
+/* fok:félhang → index a look-listában (mindkét nyelven azonos sorrend).
+   Egyszerűsítés: az azonos betűs, 1 félhangos lépés (pl. G–G#) elméletben
+   bővített prím lenne, de itt kis szekundnak számít – a hangzás a lényeg. */
 const NAME_IDX = {
   "1:0":0,  "1:1":1,
-  "2:1":2,  "2:2":3,
-  "3:3":4,  "3:4":5,
-  "4:5":6,  "4:6":7, "5:6":7,
-  "5:7":8,
-  "6:8":9,  "6:9":10,
-  "7:10":11,"7:11":12
+  "2:1":1,  "2:2":2,
+  "3:3":3,  "3:4":4,
+  "4:5":5,  "4:6":6, "5:6":6,
+  "5:7":7,
+  "6:8":8,  "6:9":9,
+  "7:10":10,"7:11":11
 };
+
+/* a Tudástár példasora: C-ről indulva a 0..12 félhangos felső hangok */
+const KNOW_HI = ["C","Db","D","Eb","E","F","F#","G","Ab","A","B","H","C"];
 
 function parse(n){
   if (n === "B") return { letter:"H", acc:"b", value:10 };   // B = leszállított H
@@ -301,6 +456,7 @@ function noteLabel(token){
   if (token === "H") return "B";
   return token.replace("#","♯").replace(/(?<=.)b/,"♭");
 }
+
 
 function makeLookQuestion(){
   const pool = Math.random() < .5 ? SHARP_POOL : FLAT_POOL;
@@ -323,44 +479,80 @@ function makeEarQuestion(){
 
 /* ════════════════ Web Audio ════════════════ */
 let ctx;
+/* Mobil böngészők (főleg iOS Safari) felfüggesztve indítják az AudioContextet;
+   felhasználói gesztuson belül resume() kell, különben néma marad. */
+function ensureCtx(){
+  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+  return ctx.state === "suspended" ? ctx.resume() : Promise.resolve();
+}
 const freq = m => 440 * Math.pow(2, (m - 69) / 12);
 const PC = ["C","C♯","D","D♯","E","F","F♯","G","G♯","A","A♯"];
 const pcName = m => (m % 12 === 11) ? (lang === "hu" ? "H" : "B") : PC[m % 12];
 const midiLabel = m => pcName(m) + "<sub>" + (Math.floor(m/12) - 1) + "</sub>";
 const midiPlain = m => pcName(m) + (Math.floor(m/12) - 1);
 
+/* Zongoraszerű hang additív szintézissel: több felharmonikus, gyors
+   (ütésszerű) megszólalás, a magasabb részhangok gyorsabban csengenek le,
+   egy záródó aluláteresztő szűrő pedig a zongora tompuló fényét adja. */
 function tone(midi, when, dur){
-  const osc = ctx.createOscillator(), gain = ctx.createGain();
-  osc.type = "triangle";
-  osc.frequency.value = freq(midi);
-  gain.gain.setValueAtTime(0, when);
-  gain.gain.linearRampToValueAtTime(0.35, when + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.001, when + dur);
-  osc.connect(gain).connect(ctx.destination);
-  osc.start(when); osc.stop(when + dur + 0.05);
+  const f = freq(midi);
+  const ring = dur * 1.6;                       // a hang tovább cseng, mint a névleges hossz
+
+  const filter = ctx.createBiquadFilter();
+  filter.type = "lowpass";
+  filter.frequency.setValueAtTime(Math.min(f * 9, 9000), when);
+  filter.frequency.exponentialRampToValueAtTime(Math.max(f * 1.6, 500), when + ring);
+  filter.Q.value = 0.4;
+
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0.5, when);
+  filter.connect(master).connect(ctx.destination);
+
+  /* részhangok: szorzó, kezdő hangerő, lecsengési idő */
+  const partials = [
+    { mult: 1,     gain: 1.00, decay: ring        },
+    { mult: 2,     gain: 0.38, decay: ring * 0.72 },
+    { mult: 3,     gain: 0.18, decay: ring * 0.50 },
+    { mult: 4,     gain: 0.09, decay: ring * 0.38 },
+    { mult: 5,     gain: 0.05, decay: ring * 0.30 },
+    { mult: 1.003, gain: 0.20, decay: ring        }   // finoman elhangolt kísérő a "húros" melegséghez
+  ];
+  partials.forEach(p => {
+    const osc = ctx.createOscillator(), g = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = f * p.mult;
+    g.gain.setValueAtTime(0, when);
+    g.gain.linearRampToValueAtTime(p.gain * 0.32, when + 0.006);   // kalapácsütés-szerű attack
+    g.gain.exponentialRampToValueAtTime(0.0004, when + p.decay);
+    osc.connect(g).connect(filter);
+    osc.start(when);
+    osc.stop(when + p.decay + 0.05);
+  });
 }
 
 function play(){
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  const t = ctx.currentTime + 0.05, dur = 0.9, gap = 0.25;
-  const lowMidi  = mode === "practice" ? pLow : q.low;
-  const highMidi = mode === "practice" ? (pSemis === null ? null : pLow + pSemis) : q.high;
-  tone(lowMidi, t, dur);
-  flash(el("lower"), 0, dur);
-  if (highMidi !== null){
-    tone(highMidi, t + dur + gap, dur);
-    flash(el("upper"), (dur + gap) * 1000, dur);
-  }
-  if (mode === "ear"){
-    heard = true;
-    if (!answered) setButtons(false);
-  }
+  ensureCtx().then(() => {
+    const t = ctx.currentTime + 0.05, dur = 0.9, gap = 0.25;
+    const lowMidi  = mode === "practice" ? pLow : q.low;
+    const highMidi = mode === "practice" ? (pSemis === null ? null : pLow + pSemis) : q.high;
+    tone(lowMidi, t, dur);
+    flash(el("lower"), 0, dur);
+    if (highMidi !== null){
+      tone(highMidi, t + dur + gap, dur);
+      flash(el("upper"), (dur + gap) * 1000, dur);
+    }
+    if (mode === "ear"){
+      heard = true;
+      if (!answered) setButtons(false);
+    }
+  });
 }
 
 function playNote(midi, node){
-  ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
-  tone(midi, ctx.currentTime + 0.05, 0.9);
-  flash(node, 0, 0.9);
+  ensureCtx().then(() => {
+    tone(midi, ctx.currentTime + 0.05, 0.9);
+    flash(node, 0, 0.9);
+  });
 }
 
 function flash(node, delayMs, dur){
@@ -370,7 +562,7 @@ function flash(node, delayMs, dur){
   }, delayMs);
 }
 
-/* ════════════════ Gyakorló mód (3. fül) ════════════════ */
+/* ════════════════ Gyakorló mód ════════════════ */
 let pLow = 60, pSemis = null;    // alapértelmezés: C4, még nincs hangköz
 
 function fillPickerOptions(){
@@ -407,6 +599,74 @@ function pickInterval(semis){
   renderPractice();
   play();                                  // a pár azonnal megszólal
 }
+
+/* ════════════════ Tudástár ════════════════ */
+function renderKnowledge(){
+  const s = S();
+  let html = "";
+
+  html += '<div class="kcard"><h2>' + s.kIntroTitle + '</h2>';
+  s.kIntro.forEach(p => { html += "<p>" + p + "</p>"; });
+  html += "</div>";
+
+  html += '<div class="kcard"><h2>' + s.kTableTitle + '</h2><p>' + s.kTableHint + "</p>";
+  s.ear.forEach((name, i) => {
+    const hiTok = KNOW_HI[i];
+    const ex = noteLabel("C") + " → " + noteLabel(hiTok) + (i === 12 ? "′" : "");
+    html += '<div class="krow" data-i="' + i + '">' +
+              '<button class="kplay" aria-label="' + s.play + '">▶</button>' +
+              '<div class="ktext"><b>' + name + "</b> · " + s.semis(i) + " · " + ex +
+              "<br><small>🎵 " + s.songs[i] + "</small></div></div>";
+  });
+  html += "</div>";
+
+  html += '<div class="kcard"><h2>' + s.kEnhTitle + '</h2><dl class="enh">';
+  s.kEnh.forEach(item => { html += "<dt>" + item[0] + "</dt><dd>" + item[1] + "</dd>"; });
+  html += "</dl></div>";
+
+  html += '<div class="kcard"><h2>' + s.kQualTitle + '</h2><p>' + s.kQual + "</p></div>";
+  html += '<div class="kcard"><h2>' + s.kNamesTitle + '</h2><p>' + s.kNames + "</p></div>";
+
+  el("knowledge").innerHTML = html;
+  el("knowledge").querySelectorAll(".krow").forEach(row => {
+    row.addEventListener("click", () => playKnowRow(+row.dataset.i, row));
+  });
+}
+
+function playKnowRow(i, row){
+  ensureCtx().then(() => {
+    const t = ctx.currentTime + 0.05, dur = 0.9, gap = 0.25;
+    tone(60, t, dur);                       // C4-ről indul minden példa
+    tone(60 + i, t + dur + gap, dur);
+    row.classList.add("playing");
+    setTimeout(() => row.classList.remove("playing"), (dur * 2 + gap) * 1000);
+  });
+}
+
+/* ════════════════ Miért? felugró kártya ════════════════ */
+function qualitySentence(deg, semis){
+  const s = S();
+  if (deg === 1 && semis === 0) return s.qualUnison;
+  if (deg === 1 && semis === 1) return s.qualAugUnison;
+  if (semis === 6) return s.qualTritone;
+  const pairs = { 2:[1,2], 3:[3,4], 6:[8,9], 7:[10,11] };
+  if (pairs[deg]) return s.qualMinMaj(s.deg[deg], pairs[deg][0], pairs[deg][1]);
+  return s.qualPerfect(s.deg[deg], semis);
+}
+
+function showWhy(){
+  if (!q || q.mode !== "look") return;
+  const s = S();
+  const lines = [
+    s.whyDistance(q.semis),
+    qualitySentence(q.deg, q.semis)
+  ];
+  el("whyTitle").textContent = noteLabel(q.lower) + " → " + noteLabel(q.upper) + " = " + s.look[q.idx].toLowerCase();
+  el("whyBody").innerHTML = lines.join("<br><br>");
+  el("whyOverlay").classList.add("show");
+}
+
+function hideWhy(){ el("whyOverlay").classList.remove("show"); }
 
 /* ════════════════ UI ════════════════ */
 let mode = "look", q, heard = false, answered = false, score = 0, total = 0;
@@ -471,8 +731,10 @@ function answer(idx, btn){
 
   let detail;
   if (mode === "look"){
-    detail = noteLabel(q.lower) + " → " + noteLabel(q.upper) + " · " +
-             s.deg[q.deg] + " " + s.degreeWord + " · " + s.semis(q.semis);
+    detail = (q.deg === 1 && q.semis === 1)
+      ? noteLabel(q.lower) + " → " + noteLabel(q.upper) + " · " + s.semis(q.semis)
+      : noteLabel(q.lower) + " → " + noteLabel(q.upper) + " · " +
+        s.deg[q.deg] + " " + s.degreeWord + " · " + s.semis(q.semis);
   } else {
     /* kiértékelés után felfedjük a hangokat */
     el("lower").innerHTML = midiLabel(q.low)  + "<small>" + s.lowerNote + "</small>";
@@ -481,6 +743,7 @@ function answer(idx, btn){
     el("upper").classList.remove("hidden-note");
     detail = s.semis(q.semis) + " · " + s.listenAgain;
   }
+  el("whyBtn").style.display = mode === "look" ? "inline" : "none";
   el("feedbackText").innerHTML =
     (ok ? s.correct : s.wrongPrefix + "<b>" + list[q.idx].toLowerCase() + "</b>. ") +
     "<small>" + detail + "</small>";
@@ -494,12 +757,24 @@ function setMode(m){
   el("tabLook").setAttribute("aria-selected", m === "look");
   el("tabEar").setAttribute("aria-selected", m === "ear");
   el("tabPractice").setAttribute("aria-selected", m === "practice");
+  el("tabKnow").setAttribute("aria-selected", m === "know");
+
+  const isKnow = m === "know";
+  el("questionCard").style.display = isKnow ? "none" : "";
+  el("answers").style.display = isKnow ? "none" : "";
+  el("knowledge").classList.toggle("visible", isKnow);
+  el("feedback").className = "feedback";
+  el("scoreBox").style.visibility = (m === "practice" || isKnow) ? "hidden" : "visible";
+
+  if (isKnow){
+    el("footerNote").textContent = s.footKnow;
+    return;
+  }
   el("prompt").textContent = { look: s.promptLook, ear: s.promptEar, practice: s.promptPractice }[m];
   el("playBtn").classList.toggle("visible", m !== "look");
   el("hint").textContent = m === "practice" ? s.hintPractice : s.hintEar;
   el("hint").classList.toggle("visible", m !== "look");
   el("picker").classList.toggle("visible", m === "practice");
-  el("scoreBox").style.visibility = m === "practice" ? "hidden" : "visible";
   el("footerNote").textContent = { look: s.footLook, ear: s.footEar, practice: s.footPractice }[m];
   buildAnswers();
   render();
@@ -517,22 +792,32 @@ function applyLang(l){
   el("startLabel").textContent = s.startNote;
   el("playBtn").textContent = s.play;
   el("nextBtn").textContent = s.next;
+  el("whyBtn").textContent = s.why;
+  el("whyClose").textContent = s.close;
   el("tabLook").textContent = s.tabLook;
   el("tabEar").textContent = s.tabEar;
   el("tabPractice").textContent = s.tabPractice;
+  el("tabKnow").textContent = s.tabKnow;
   el("tabsBox").setAttribute("aria-label", s.modeAria);
   el("answers").setAttribute("aria-label", s.answersAria);
   fillPickerOptions();
+  renderKnowledge();
+  hideWhy();
   setMode(mode);      // felirat- és kérdésfrissítés az aktuális fülön
 }
 
 el("tabLook").addEventListener("click", () => setMode("look"));
 el("tabEar").addEventListener("click", () => setMode("ear"));
 el("tabPractice").addEventListener("click", () => setMode("practice"));
+el("tabKnow").addEventListener("click", () => setMode("know"));
 el("btnEn").addEventListener("click", () => { if (lang !== "en") applyLang("en"); });
 el("btnHu").addEventListener("click", () => { if (lang !== "hu") applyLang("hu"); });
 el("playBtn").addEventListener("click", play);
 el("nextBtn").addEventListener("click", render);
+el("whyBtn").addEventListener("click", showWhy);
+el("whyClose").addEventListener("click", hideWhy);
+el("whyOverlay").addEventListener("click", e => { if (e.target === el("whyOverlay")) hideWhy(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") hideWhy(); });
 el("lower").addEventListener("click", () => { if (mode === "practice") playNote(pLow, el("lower")); });
 el("upper").addEventListener("click", () => { if (mode === "practice" && pSemis !== null) playNote(pLow + pSemis, el("upper")); });
 el("startNote").addEventListener("change", e => {
